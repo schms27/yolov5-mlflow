@@ -14,10 +14,11 @@ from torch.utils.tensorboard import SummaryWriter
 from utils.general import LOGGER, colorstr, cv2
 from utils.loggers.clearml.clearml_utils import ClearmlLogger
 from utils.loggers.wandb.wandb_utils import WandbLogger
+from utils.loggers.mlflow.mlflow_utils import MLflowLogger
 from utils.plots import plot_images, plot_labels, plot_results
 from utils.torch_utils import de_parallel
 
-LOGGERS = ('csv', 'tb', 'wandb', 'clearml', 'comet')  # *.csv, TensorBoard, Weights & Biases, ClearML
+LOGGERS = ('csv', 'tb', 'wandb', 'clearml', 'comet', 'mlflow')  # *.csv, TensorBoard, Weights & Biases, ClearML
 RANK = int(os.getenv('RANK', -1))
 
 try:
@@ -52,6 +53,14 @@ try:
 
 except (ModuleNotFoundError, ImportError, AssertionError):
     comet_ml = None
+
+
+try:
+    import mlflow
+
+    assert hasattr(mlflow, '__version__')  # verify package import not local dir
+except (ImportError, AssertionError):
+    mlflow = None
 
 
 class Loggers():
@@ -133,6 +142,12 @@ class Loggers():
 
         else:
             self.comet_logger = None
+
+        # MLflow
+        if mlflow and 'mlflow' in self.include:
+            self.mlflow = MLflowLogger(self.opt, self.hyp)
+        else:
+            self.mlflow = None
 
     @property
     def remote_dataset(self):
