@@ -1,6 +1,7 @@
 import logging
 import os
 from urllib.parse import urlparse
+from utils.general import colorstr
 
 try:
     import mlflow
@@ -24,7 +25,44 @@ class MLflowLogger():
         hyp (dict) -- Hyperparameters for this run
 
         """
+        remote_url = "localhost:5000"
+        experiment_name = "TestName"
+        logger.info(f"{colorstr('green', 'bold', 'MLflow:')} logger started, remote registry url: {colorstr('green', 'underline', remote_url)}, experiment name: {colorstr('green', 'underline', experiment_name)}")
 
+        mlflow.set_registry_uri(remote_url) 
+        mlflow.set_experiment(experiment_name)
+
+    def on_train_start(self):
+        logger.info('mlflow.on_train_start')
+        pass
+
+    def on_train_end(self, files, save_dir, last, best, epoch, final_results):
+        logger.info('mlflow.on_train_end')
+        pass
+
+    def on_pretrain_routine_start(self):
+        logger.info('mlflow.on_pretrain_routine_start')
+        pass
+
+    def on_pretrain_routine_end(self):
+        logger.info('mlflow.on_pretrain_routine_end')
+        pass
+
+    def on_train_batch_end(self, log_dict, step):
+        logger.info('mlflow.on_train_batch_end')
+        pass
+
+    def on_train_epoch_end(self, epoch):
+        logger.info('mlflow.on_train_epoch_end')
+        pass
+
+    def on_val_start(self):
+        logger.info('mlflow.on_val_start')
+        pass
+
+    def on_val_end(self, nt, tp, fp, p, r, f1, ap, ap50, ap_class, confusion_matrix):
+        logger.info('mlflow.on_val_end')
+        pass
 
     def log(self, log_dict):
         """

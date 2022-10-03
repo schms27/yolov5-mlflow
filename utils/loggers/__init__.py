@@ -165,10 +165,14 @@ class Loggers():
     def on_train_start(self):
         if self.comet_logger:
             self.comet_logger.on_train_start()
+        if self.mlflow:
+            self.mlflow.on_train_start()
 
     def on_pretrain_routine_start(self):
         if self.comet_logger:
             self.comet_logger.on_pretrain_routine_start()
+        if self.mlflow:
+            self.mlflow.on_pretrain_routine_start()
 
     def on_pretrain_routine_end(self, labels, names):
         # Callback runs on pre-train routine end
@@ -181,6 +185,9 @@ class Loggers():
             #    pass  # ClearML saves these images automatically using hooks
             if self.comet_logger:
                 self.comet_logger.on_pretrain_routine_end(paths)
+
+            if self.mlflow:
+                self.mlflow.on_pretrain_routine_end()
 
     def on_train_batch_end(self, model, ni, imgs, targets, paths, vals):
         log_dict = dict(zip(self.keys[0:3], vals))
@@ -202,6 +209,9 @@ class Loggers():
         if self.comet_logger:
             self.comet_logger.on_train_batch_end(log_dict, step=ni)
 
+        if self.mlflow:
+            self.mlflow.on_train_batch_end(log_dict, step=ni)
+
     def on_train_epoch_end(self, epoch):
         # Callback runs on train epoch end
         if self.wandb:
@@ -209,10 +219,16 @@ class Loggers():
 
         if self.comet_logger:
             self.comet_logger.on_train_epoch_end(epoch)
+        
+        if self.mlflow:
+            self.mlflow.on_train_epoch_end(epoch)
 
     def on_val_start(self):
         if self.comet_logger:
             self.comet_logger.on_val_start()
+        
+        if self.mlflow:
+            self.mlflow.on_val_start()
 
     def on_val_image_end(self, pred, predn, path, names, im):
         # Callback runs on val image end
@@ -236,6 +252,9 @@ class Loggers():
 
         if self.comet_logger:
             self.comet_logger.on_val_end(nt, tp, fp, p, r, f1, ap, ap50, ap_class, confusion_matrix)
+        
+        if self.mlflow:
+            self.mlflow.on_val_end(nt, tp, fp, p, r, f1, ap, ap50, ap_class, confusion_matrix)
 
     def on_fit_epoch_end(self, vals, epoch, best_fitness, fi):
         # Callback runs at the end of each fit (train+val) epoch
@@ -314,6 +333,10 @@ class Loggers():
         if self.comet_logger:
             final_results = dict(zip(self.keys[3:10], results))
             self.comet_logger.on_train_end(files, self.save_dir, last, best, epoch, final_results)
+
+        if self.mlflow:
+            final_results = dict(zip(self.keys[3:10], results))
+            self.mlflow.on_train_end(files, self.save_dir, last, best, epoch, final_results)
 
     def on_params_update(self, params: dict):
         # Update hyperparams or configs of the experiment
