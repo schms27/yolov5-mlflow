@@ -472,6 +472,11 @@ def parse_opt(known=False):
     parser.add_argument('--bbox_interval', type=int, default=-1, help='Set bounding-box image logging interval')
     parser.add_argument('--artifact_alias', type=str, default='latest', help='Version of dataset artifact to use')
 
+    parser.add_argument('--remote-uri', type=str, default='http://localhost:5000', help='MLflow endpoint')
+    parser.add_argument('--experiment-name', type=str, default='YOLOv5 Experiment', help='Name of MLflow Experiment')
+    parser.add_argument('--run-name', type=str, help='Name of current run, autogenerates one if left empty')
+    parser.add_argument('--run-description', type=str, default='', help='Long description of current run')
+
     return parser.parse_known_args()[0] if known else parser.parse_args()
 
 

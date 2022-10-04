@@ -1,6 +1,7 @@
+import argparse
 import logging
-import os
-from urllib.parse import urlparse
+import re
+import friendlywords as fw
 from utils.general import colorstr
 
 try:
@@ -8,7 +9,6 @@ try:
 except (ModuleNotFoundError, ImportError):
     mlflow = None
 
-import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -25,187 +25,82 @@ class MLflowLogger():
         hyp (dict) -- Hyperparameters for this run
 
         """
-        remote_url = "localhost:5000"
-        experiment_name = "TestName"
-        logger.info(f"{colorstr('green', 'bold', 'MLflow:')} logger started, remote registry url: {colorstr('green', 'underline', remote_url)}, experiment name: {colorstr('green', 'underline', experiment_name)}")
+        self.remote_url = opt.remote_uri
+        self.experiment_name = opt.experiment_name
+        self.run_name = opt.run_name if isinstance(opt.run_name, str) else fw.generate('po', separator='-')
+        self.run_description = opt.run_description
+        self.hyperparams = dict((f'hyp.{tag}', val) for tag, val in hyp.items()) 
+        self.training_params = self.get_relevant_training_params(opt)
 
-        mlflow.set_registry_uri(remote_url) 
-        mlflow.set_experiment(experiment_name)
+        logger.info(f"{colorstr('green', 'bold', 'MLflow:')} logger started, remote registry url: {colorstr('green', 'underline', self.remote_url)}, experiment name: {colorstr('green', 'underline', self.experiment_name)}")
+
+        mlflow.set_tracking_uri(self.remote_url) 
+        mlflow.set_registry_uri(self.remote_url) 
+        mlflow.set_experiment(self.experiment_name)
 
     def on_train_start(self):
-        logger.info('mlflow.on_train_start')
-        pass
+        mlflow.start_run(run_name=self.run_name, description=self.run_description)
+        mlflow.log_params(self.training_params)
+        mlflow.log_params(self.hyperparams)
+        logger.debug('mlflow.on_train_start')
 
     def on_train_end(self, files, save_dir, last, best, epoch, final_results):
-        logger.info('mlflow.on_train_end')
-        pass
+        mlflow.set_tag("run.save_dir", save_dir)
+        mlflow.set_tag("run.best_model", best.name)
+        mlflow.set_tag("run.last_model", last.name)
+        mlflow.log_metrics(self.clean_tags(final_results), epoch)
+        for file in files:
+            mlflow.log_artifact(file)
+        mlflow.end_run()
+        logger.debug('mlflow.on_train_end')
 
     def on_pretrain_routine_start(self):
-        logger.info('mlflow.on_pretrain_routine_start')
-        pass
+        logger.debug('mlflow.on_pretrain_routine_start')
 
     def on_pretrain_routine_end(self):
-        logger.info('mlflow.on_pretrain_routine_end')
-        pass
+        logger.debug('mlflow.on_pretrain_routine_end')
 
     def on_train_batch_end(self, log_dict, step):
-        logger.info('mlflow.on_train_batch_end')
-        pass
+        logger.debug('mlflow.on_train_batch_end')
 
     def on_train_epoch_end(self, epoch):
-        logger.info('mlflow.on_train_epoch_end')
-        pass
+        logger.debug('mlflow.on_train_epoch_end')
+
+    def on_fit_epoch_end(self, x, epoch):
+        """
+        callback runs at the end of each fit (train+val) epoch
+        """
+        mlflow.log_metrics(self.clean_tags(x), epoch)
+        logger.debug('mlflow.on_fit_epoch_end')
 
     def on_val_start(self):
-        logger.info('mlflow.on_val_start')
-        pass
+        logger.debug('mlflow.on_val_start')
 
     def on_val_end(self, nt, tp, fp, p, r, f1, ap, ap50, ap_class, confusion_matrix):
-        logger.info('mlflow.on_val_end')
-        pass
+        logger.debug('mlflow.on_val_end')
 
-    def log(self, log_dict):
+    def clean_tags(self, dict):
         """
-        save the metrics to the logging dictionary
-        arguments:
-        log_dict (Dict) -- metrics/media to be logged in current step
+        mlflow does not accept all chars in metric names, therefore we need to replace them
+        i.e. colons, semicolons...
         """
-        pass
+        clean_dict = {}
+        for tag in dict:
+            clean_tag = re.sub('[^a-zA-Z0-9\/\_\-\. ]', '-', tag)
+            clean_dict[clean_tag] = dict[tag]
+        return clean_dict
 
-#COMET_PREFIX = "comet://"
-#COMET_MODEL_NAME = os.getenv("COMET_MODEL_NAME", "yolov5")
-#COMET_DEFAULT_CHECKPOINT_FILENAME = os.getenv("COMET_DEFAULT_CHECKPOINT_FILENAME", "last.pt")
-#
-#
-#def download_model_checkpoint(opt, experiment):
-#    model_dir = f"{opt.project}/{experiment.name}"
-#    os.makedirs(model_dir, exist_ok=True)
-#
-#    model_name = COMET_MODEL_NAME
-#    model_asset_list = experiment.get_model_asset_list(model_name)
-#
-#    if len(model_asset_list) == 0:
-#        logger.error(f"COMET ERROR: No checkpoints found for model name : {model_name}")
-#        return
-#
-#    model_asset_list = sorted(
-#        model_asset_list,
-#        key=lambda x: x["step"],
-#        reverse=True,
-#    )
-#    logged_checkpoint_map = {asset["fileName"]: asset["assetId"] for asset in model_asset_list}
-#
-#    resource_url = urlparse(opt.weights)
-#    checkpoint_filename = resource_url.query
-#
-#    if checkpoint_filename:
-#        asset_id = logged_checkpoint_map.get(checkpoint_filename)
-#    else:
-#        asset_id = logged_checkpoint_map.get(COMET_DEFAULT_CHECKPOINT_FILENAME)
-#        checkpoint_filename = COMET_DEFAULT_CHECKPOINT_FILENAME
-#
-#    if asset_id is None:
-#        logger.error(f"COMET ERROR: Checkpoint {checkpoint_filename} not found in the given Experiment")
-#        return
-#
-#    try:
-#        logger.info(f"COMET INFO: Downloading checkpoint {checkpoint_filename}")
-#        asset_filename = checkpoint_filename
-#
-#        model_binary = experiment.get_asset(asset_id, return_type="binary", stream=False)
-#        model_download_path = f"{model_dir}/{asset_filename}"
-#        with open(model_download_path, "wb") as f:
-#            f.write(model_binary)
-#
-#        opt.weights = model_download_path
-#
-#    except Exception as e:
-#        logger.warning("COMET WARNING: Unable to download checkpoint from Comet")
-#        logger.exception(e)
-#
-#
-#def set_opt_parameters(opt, experiment):
-#    """Update the opts Namespace with parameters
-#    from Comet's ExistingExperiment when resuming a run
-#
-#    Args:
-#        opt (argparse.Namespace): Namespace of command line options
-#        experiment (comet_ml.APIExperiment): Comet API Experiment object
-#    """
-#    asset_list = experiment.get_asset_list()
-#    resume_string = opt.resume
-#
-#    for asset in asset_list:
-#        if asset["fileName"] == "opt.yaml":
-#            asset_id = asset["assetId"]
-#            asset_binary = experiment.get_asset(asset_id, return_type="binary", stream=False)
-#            opt_dict = yaml.safe_load(asset_binary)
-#            for key, value in opt_dict.items():
-#                setattr(opt, key, value)
-#            opt.resume = resume_string
-#
-#    # Save hyperparameters to YAML file
-#    # Necessary to pass checks in training script
-#    save_dir = f"{opt.project}/{experiment.name}"
-#    os.makedirs(save_dir, exist_ok=True)
-#
-#    hyp_yaml_path = f"{save_dir}/hyp.yaml"
-#    with open(hyp_yaml_path, "w") as f:
-#        yaml.dump(opt.hyp, f)
-#    opt.hyp = hyp_yaml_path
-#
-#
-#def check_comet_weights(opt):
-#    """Downloads model weights from Comet and updates the
-#    weights path to point to saved weights location
-#
-#    Args:
-#        opt (argparse.Namespace): Command Line arguments passed
-#            to YOLOv5 training script
-#
-#    Returns:
-#        None/bool: Return True if weights are successfully downloaded
-#            else return None
-#    """
-#    if comet_ml is None:
-#        return
-#
-#    if isinstance(opt.weights, str):
-#        if opt.weights.startswith(COMET_PREFIX):
-#            api = comet_ml.API()
-#            resource = urlparse(opt.weights)
-#            experiment_path = f"{resource.netloc}{resource.path}"
-#            experiment = api.get(experiment_path)
-#            download_model_checkpoint(opt, experiment)
-#            return True
-#
-#    return None
-#
-#
-#def check_comet_resume(opt):
-#    """Restores run parameters to its original state based on the model checkpoint
-#    and logged Experiment parameters.
-#
-#    Args:
-#        opt (argparse.Namespace): Command Line arguments passed
-#            to YOLOv5 training script
-#
-#    Returns:
-#        None/bool: Return True if the run is restored successfully
-#            else return None
-#    """
-#    if comet_ml is None:
-#        return
-#
-#    if isinstance(opt.resume, str):
-#        if opt.resume.startswith(COMET_PREFIX):
-#            api = comet_ml.API()
-#            resource = urlparse(opt.resume)
-#            experiment_path = f"{resource.netloc}{resource.path}"
-#            experiment = api.get(experiment_path)
-#            set_opt_parameters(opt, experiment)
-#            download_model_checkpoint(opt, experiment)
-#
-#            return True
-#
-#    return None
+    def get_relevant_training_params(self, opt):
+        """
+        Filters the commandline params for relevant params and returns a dictionary of them
+        """
+        return {
+            "opt.batch_size": opt.batch_size,
+            "opt.epochs": opt.epochs,
+            "opt.dataset_definition": opt.data,
+            "opt.optimizer": opt.optimizer,
+            "opt.input_weights": opt.weights,
+            "opt.image_size": opt.imgsz,
+            "opt.project_path": opt.project,
+            "opt.training_device": opt.device
+        }

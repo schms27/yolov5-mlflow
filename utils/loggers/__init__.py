@@ -288,6 +288,9 @@ class Loggers():
 
         if self.comet_logger:
             self.comet_logger.on_fit_epoch_end(x, epoch=epoch)
+        
+        if self.mlflow:
+            self.mlflow.on_fit_epoch_end(x, epoch=epoch)
 
     def on_model_save(self, last, epoch, final_epoch, best_fitness, fi):
         # Callback runs on model save event
